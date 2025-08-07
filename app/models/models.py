@@ -3,9 +3,10 @@ from sqlalchemy.sql.expression import text
 from sqlalchemy.sql.sqltypes import TIMESTAMP
 from sqlalchemy.orm import relationship
 from app.db.database import Base
+from pydantic import BaseModel
 
 
-class User(Base):
+class User(BaseModel):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, nullable=False, unique=True, autoincrement=True)
@@ -23,7 +24,7 @@ class User(Base):
     carts = relationship("Cart", back_populates="user")
 
 
-class Cart(Base):
+class Cart(BaseModel):
     __tablename__ = "carts"
 
     id = Column(Integer, primary_key=True, nullable=False, unique=True, autoincrement=True)
@@ -38,7 +39,7 @@ class Cart(Base):
     cart_items = relationship("CartItem", back_populates="cart")
 
 
-class CartItem(Base):
+class CartItem(BaseModel):
     __tablename__ = "cart_items"
 
     id = Column(Integer, primary_key=True, nullable=False, unique=True, autoincrement=True)
@@ -52,7 +53,7 @@ class CartItem(Base):
     product = relationship("Product", back_populates="cart_items")
 
 
-class Category(Base):
+class Category(BaseModel):
     __tablename__ = "categories"
 
     id = Column(Integer, primary_key=True, nullable=False, unique=True, autoincrement=True)
@@ -62,7 +63,7 @@ class Category(Base):
     products = relationship("Product", back_populates="category")
 
 
-class Product(Base):
+class Product(BaseModel):
     __tablename__ = "products"
 
     id = Column(Integer, primary_key=True, nullable=False, unique=True, autoincrement=True)

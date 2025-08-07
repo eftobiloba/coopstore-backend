@@ -3,9 +3,9 @@ from fastapi import FastAPI
 
 
 description = """
-Welcome to the E-commerce API! 🚀
+Welcome to the CoopStore E-commerce API! 🚀
 
-This API provides a comprehensive set of functionalities for managing your e-commerce platform.
+This API provides a comprehensive set of functionalities for managing the e-commerce platform.
 
 Key features include:
 
@@ -25,17 +25,16 @@ Key features include:
 
 For any inquiries, please contact:
 
-* Github: https://github.com/aliseyedi01
 """
 
 
 app = FastAPI(
     description=description,
-    title="E-commerce API",
+    title="CoopStore E-commerce APIs",
     version="1.0.0",
     contact={
-        "name": "Ali Seyedi",
-        "url": "https://github.com/aliseyedi01",
+        "name": "Faseyitan Tobiloba",
+        "url": "https://github.com/eftobiloba/coopstore-frontend",
     },
     swagger_ui_parameters={
         "syntaxHighlight.theme": "monokai",
