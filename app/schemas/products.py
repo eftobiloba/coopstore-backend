@@ -11,6 +11,7 @@ class BaseConfig:
 
 class ProductBase(BaseModel):
     id: int
+    blob: Optional[str] = None
     title: str
     description: Optional[str]
     price: int
@@ -28,6 +29,7 @@ class ProductBase(BaseModel):
     thumbnail: str
     images: List[str]
     is_published: bool
+    type: str
     created_at: datetime
     category_id: int
     category: CategoryBase
@@ -46,8 +48,32 @@ class ProductCreate(ProductBase):
 
 
 # Update Product
-class ProductUpdate(ProductCreate):
-    pass
+class ProductUpdate(BaseModel):
+    blob: Optional[str] = None
+    title: Optional[str] = None
+    description: Optional[str]
+    price: Optional[int] = None
+
+    @validator("discount_percentage", pre=True)
+    def validate_discount_percentage(cls, v):
+        if v < 0 or v > 100:
+            raise ValueError("discount_percentage must be between 0 and 100")
+        return v
+
+    discount_percentage: Optional[float] = None
+    rating: Optional[float] = None
+    stock: Optional[int] = None
+    brand: Optional[str] = None
+    thumbnail: Optional[str] = None
+    images: Optional[List[str]] = None
+    is_published: Optional[bool] = None
+    type: Optional[str] = None
+    created_at: Optional[datetime] = None
+    category_id: Optional[int] = None
+    category: Optional[CategoryBase] = None
+
+    class Config(BaseConfig):
+        pass
 
 
 # Get Products

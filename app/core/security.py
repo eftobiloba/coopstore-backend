@@ -11,14 +11,13 @@ from sqlalchemy.orm import Session
 from fastapi.security import HTTPBearer
 from app.db.database import get_db
 from app.utils.responses import ResponseHandler
+from bson import ObjectId
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 auth_scheme = HTTPBearer()
 
 # Create Hash Password
-
-
 def get_password_hash(password):
     return pwd_context.hash(password)
 
@@ -79,6 +78,6 @@ def check_admin_role(
         db: Session = Depends(get_db)):
     user = get_token_payload(token.credentials)
     user_id = user.get('id')
-    role_user = db.query(User).filter(User.id == user_id).first()
-    if role_user.role != "admin":
+    role_user = db.users.find_one({"_id": ObjectId(user_id)})  # or _id if using ObjectId
+    if not role_user or role_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Admin role required")

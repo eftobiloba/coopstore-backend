@@ -1,5 +1,5 @@
 from pydantic import BaseModel , EmailStr
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 from app.schemas.carts import CartBase
 
@@ -16,6 +16,7 @@ class UserBase(BaseModel):
     password: str
     role: str
     is_active: bool
+    is_member: bool
     created_at: datetime
     carts: List[CartBase]
 
@@ -28,13 +29,23 @@ class UserCreate(BaseModel):
     username: str
     email: str
     password: str
+    role: str
+    is_member: bool
 
     class Config(BaseConfig):
         pass
 
 
-class UserUpdate(UserCreate):
-    pass
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    username: Optional[str] = None
+    email: Optional[str] = None
+    password: Optional[str] = None
+    role: Optional[str] = None
+    is_member: Optional[bool] = None
+
+    class Config(BaseConfig):
+        pass
 
 
 class UserOut(BaseModel):

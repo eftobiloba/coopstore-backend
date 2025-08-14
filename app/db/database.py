@@ -1,28 +1,39 @@
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
 from typing import Generator
 from app.core.config import settings
+from pymongo import MongoClient
+import certifi
 
+# MongoDB connection setup
+DATABASE_URL = settings.mongodb_uri
+ca = certifi.where()
 
-DATABASE_URL = f"postgresql://{settings.db_username}:{settings.db_password}@{settings.db_hostname}:{settings.db_port}/{settings.db_name}"
+client = MongoClient(DATABASE_URL, tls=True, tlsCAFile=ca)
+mongo_db = client.store_db  # renamed from `db` to avoid confusion
 
-# Establish a connection to the PostgreSQL database
-engine = create_engine(DATABASE_URL)
+# Collections
+users_collection = mongo_db["user_collection"]
+membership_applications_collection = mongo_db["membership_applications_collection"]
+products_collection = mongo_db["products_collection"]
+categories_collection = mongo_db["categories_collection"]
+financial_products_collection = mongo_db["financial_products_collection"]
+carts_collection = mongo_db["carts_collection"]
+cart_items_collection = mongo_db["cart_items_collection"]
+orders_collection = mongo_db["orders_collection"]
+bnpl_applications_collection = mongo_db["bnpl_applications_collection"]
+reviews_collection = mongo_db["reviews_collection"]
+promo_banners_collection = mongo_db["promo_banners_collection"]
 
+# Indexes
+# users_collection.create_index("coop_id", unique=True)
 
-# Create database tables based on the defined SQLAlchemy models (subclasses of the Base class)
-Base = declarative_base()
-Base.metadata.create_all(engine)
-
-
-# Connect to the database and provide a session for interacting with it
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-
+# Dependency for FastAPI
 def get_db() -> Generator:
-    db = SessionLocal()
+    """
+    FastAPI dependency that yields the MongoDB database.
+    Keeps a single global client alive.
+    """
     try:
-        yield db
+        yield mongo_db
     finally:
-        db.close()
+        # We don't close the client here to keep the connection pooled.
+        pass

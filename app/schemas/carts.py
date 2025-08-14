@@ -77,7 +77,7 @@ class CartOutDelete(BaseModel):
 
 # Create Cart
 class CartItemCreate(BaseModel):
-    product_id: int
+    product_id: str
     quantity: int
 
 

@@ -1,54 +1,64 @@
-from sqlalchemy.orm import Session
-from app.models.models import Product, Category
-from app.schemas.products import ProductCreate, ProductUpdate
+from bson import ObjectId
 from app.utils.responses import ResponseHandler
-
+from app.schemas.products import ProductCreate, ProductUpdate
+from app.services.helpers import blob_generator, serialize_doc, array_serialize_doc
 
 class ProductService:
-    @staticmethod
-    def get_all_products(db: Session, page: int, limit: int, search: str = ""):
-        products = db.query(Product).order_by(Product.id.asc()).filter(
-            Product.title.contains(search)).limit(limit).offset((page - 1) * limit).all()
-        return {"message": f"Page {page} with {limit} products", "data": products}
+    def __init__(self, db):
+        # db is your MongoDB database instance (not a session)
+        self.products = db["products_collection"]
+        self.categories = db["categories_collection"]
 
-    @staticmethod
-    def get_product(db: Session, product_id: int):
-        product = db.query(Product).filter(Product.id == product_id).first()
+    def get_all_products(self, page: int, limit: int, search: str = ""):
+        query = {}
+        if search:
+            query["title"] = {"$regex": search, "$options": "i"}
+
+        cursor = self.products.find(query).sort("_id", 1).skip((page - 1) * limit).limit(limit)
+        products = list(cursor)
+
+        return {
+            "message": f"Page {page} with {limit} products",
+            "data": array_serialize_doc(products)
+        }
+
+    def get_product(self, product_id: str):
+        product = self.products.find_one({"blob": product_id})
         if not product:
             ResponseHandler.not_found_error("Product", product_id)
-        return ResponseHandler.get_single_success(product.title, product_id, product)
+        return ResponseHandler.get_single_success(product["title"], str(product["_id"]), serialize_doc(product))
 
-    @staticmethod
-    def create_product(db: Session, product: ProductCreate):
-        category_exists = db.query(Category).filter(Category.id == product.category_id).first()
+    def create_product(self, product: ProductCreate):
+        category_exists = self.categories.find_one({"number": product.category_id})
         if not category_exists:
             ResponseHandler.not_found_error("Category", product.category_id)
 
         product_dict = product.model_dump()
-        db_product = Product(**product_dict)
-        db.add(db_product)
-        db.commit()
-        db.refresh(db_product)
-        return ResponseHandler.create_success(db_product.title, db_product.id, db_product)
+        product_dict["blob"] = blob_generator(product_dict["title"])
 
-    @staticmethod
-    def update_product(db: Session, product_id: int, updated_product: ProductUpdate):
-        db_product = db.query(Product).filter(Product.id == product_id).first()
-        if not db_product:
+        result = self.products.insert_one(product_dict)
+        new_product = self.products.find_one({"_id": ObjectId(result.inserted_id)})
+
+        return ResponseHandler.create_success(new_product["title"], str(new_product["_id"]), serialize_doc(new_product))
+
+    def update_product(self, product_id: str, updated_product: ProductUpdate):
+        product_exists = self.products.find_one({"blob": product_id})
+        if not product_exists:
             ResponseHandler.not_found_error("Product", product_id)
 
-        for key, value in updated_product.model_dump().items():
-            setattr(db_product, key, value)
+        update_data = {k: v for k, v in updated_product.model_dump().items() if v is not None}
+        if "category_id" in update_data:
+            update_data["category_id"] = ObjectId(update_data["category_id"])
 
-        db.commit()
-        db.refresh(db_product)
-        return ResponseHandler.update_success(db_product.title, db_product.id, db_product)
+        self.products.update_one({"_id": ObjectId(product_id)}, {"$set": update_data})
+        updated = self.products.find_one({"_id": ObjectId(product_id)})
 
-    @staticmethod
-    def delete_product(db: Session, product_id: int):
-        db_product = db.query(Product).filter(Product.id == product_id).first()
-        if not db_product:
+        return ResponseHandler.update_success(updated["title"], str(updated["_id"]), serialize_doc(updated))
+
+    def delete_product(self, product_id: str):
+        product = self.products.find_one({"blob": product_id})
+        if not product:
             ResponseHandler.not_found_error("Product", product_id)
-        db.delete(db_product)
-        db.commit()
-        return ResponseHandler.delete_success(db_product.title, db_product.id, db_product)
+
+        self.products.delete_one({"_id": ObjectId(product_id)})
+        return ResponseHandler.delete_success(product["title"], str(product["_id"]), serialize_doc(product))

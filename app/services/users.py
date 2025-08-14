@@ -1,52 +1,84 @@
-from sqlalchemy.orm import Session
-from app.models.models import User
-from app.schemas.users import UserCreate, UserUpdate
+from bson import ObjectId
 from app.utils.responses import ResponseHandler
+from app.schemas.users import UserCreate, UserUpdate
 from app.core.security import get_password_hash
-
+from app.services.helpers import serialize_doc, array_serialize_doc
 
 class UserService:
-    @staticmethod
-    def get_all_users(db: Session, page: int, limit: int, search: str = "", role: str = "user"):
-        users = db.query(User).order_by(User.id.asc()).filter(
-            User.username.contains(search), User.role == role).limit(limit).offset((page - 1) * limit).all()
-        return {"message": f"Page {page} with {limit} users", "data": users}
+    def __init__(self, db):
+        # db is your MongoDB database instance
+        self.users = db["user_collection"]
 
-    @staticmethod
-    def get_user(db: Session, user_id: int):
-        user = db.query(User).filter(User.id == user_id).first()
+    def get_all_users(self, page: int, limit: int, search: str = "", role: str = "user"):
+        query = {"role": role}
+        if search:
+            query["username"] = {"$regex": search, "$options": "i"}
+
+        cursor = (
+            self.users.find(query)
+            .sort("_id", 1)
+            .skip((page - 1) * limit)
+            .limit(limit)
+        )
+        users = array_serialize_doc(cursor)
+
+        return {
+            "message": f"Page {page} with {limit} users",
+            "data": users
+        }
+
+    def get_user(self, user_id: str):
+        try:
+            oid = ObjectId(user_id)
+        except:
+            return ResponseHandler.not_found_error("User", user_id)
+
+        user = self.users.find_one({"_id": oid})
         if not user:
-            ResponseHandler.not_found_error("User", user_id)
-        return ResponseHandler.get_single_success(user.username, user_id, user)
+            return ResponseHandler.not_found_error("User", user_id)
 
-    @staticmethod
-    def create_user(db: Session, user: UserCreate):
+        return ResponseHandler.get_single_success(user.get("username"), str(user["_id"]), serialize_doc(user))
+
+    def create_user(self, user: UserCreate):
         hashed_password = get_password_hash(user.password)
-        user.password = hashed_password
-        db_user = User(id=None, **user.model_dump())
-        db.add(db_user)
-        db.commit()
-        db.refresh(db_user)
-        return ResponseHandler.create_success(db_user.username, db_user.id, db_user)
+        user_dict = user.model_dump()
+        user_dict["password"] = hashed_password
 
-    @staticmethod
-    def update_user(db: Session, user_id: int, updated_user: UserUpdate):
-        db_user = db.query(User).filter(User.id == user_id).first()
-        if not db_user:
-            ResponseHandler.not_found_error("User", user_id)
+        result = self.users.insert_one(user_dict)
+        new_user = self.users.find_one({"_id": result.inserted_id})
 
-        for key, value in updated_user.model_dump().items():
-            setattr(db_user, key, value)
+        return ResponseHandler.create_success(new_user["username"], str(new_user["_id"]), serialize_doc(new_user))
 
-        db.commit()
-        db.refresh(db_user)
-        return ResponseHandler.update_success(db_user.username, db_user.id, db_user)
+    def update_user(self, user_id: str, updated_user: UserUpdate):
+        try:
+            oid = ObjectId(user_id)
+        except:
+            return ResponseHandler.not_found_error("User", user_id)
 
-    @staticmethod
-    def delete_user(db: Session, user_id: int):
-        db_user = db.query(User).filter(User.id == user_id).first()
-        if not db_user:
-            ResponseHandler.not_found_error("User", user_id)
-        db.delete(db_user)
-        db.commit()
-        return ResponseHandler.delete_success(db_user.username, db_user.id, db_user)
+        user_exists = self.users.find_one({"_id": oid})
+        if not user_exists:
+            return ResponseHandler.not_found_error("User", user_id)
+
+        update_data = {k: v for k, v in updated_user.model_dump().items() if v is not None}
+
+        # Hash password if updated
+        if "password" in update_data:
+            update_data["password"] = get_password_hash(update_data["password"])
+
+        self.users.update_one({"_id": oid}, {"$set": update_data})
+        updated = self.users.find_one({"_id": oid})
+
+        return ResponseHandler.update_success(updated["username"], str(updated["_id"]), serialize_doc(updated))
+
+    def delete_user(self, user_id: str):
+        try:
+            oid = ObjectId(user_id)
+        except:
+            return ResponseHandler.not_found_error("User", user_id)
+
+        user = self.users.find_one({"_id": oid})
+        if not user:
+            return ResponseHandler.not_found_error("User", user_id)
+
+        self.users.delete_one({"_id": oid})
+        return ResponseHandler.delete_success(user["username"], str(user["_id"]), serialize_doc(user))

@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 from app.schemas.carts import CartBase
 
 
@@ -19,9 +19,9 @@ class AccountBase(BaseModel):
 
 
 class AccountUpdate(BaseModel):
-    username: str
-    email: EmailStr
-    full_name: str
+    username: Optional[str] = None
+    email: Optional[EmailStr] = None
+    full_name: Optional[str] = None
 
 
 class AccountOut(BaseModel):

@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -9,10 +9,12 @@ class CategoryBase(BaseModel):
 
 class CategoryCreate(BaseModel):
     name: str
+    number: int
 
 
 class CategoryUpdate(BaseModel):
-    name: str
+    name: Optional[str] = None
+    number: Optional[int] = None
 
 
 class CategoryOut(BaseModel):

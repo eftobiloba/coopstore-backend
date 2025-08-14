@@ -1,109 +1,125 @@
-from sqlalchemy.orm import Session
-from app.models.models import Cart, CartItem, Product
-from app.schemas.carts import CartUpdate, CartCreate
+from bson import ObjectId
+from app.core.security import get_token_payload
 from app.utils.responses import ResponseHandler
-from sqlalchemy.orm import joinedload
-from app.core.security import get_current_user
+from app.schemas.carts import CartCreate, CartUpdate
+from app.services.helpers import serialize_doc, array_serialize_doc
 
 
 class CartService:
-    # Get All Carts
-    @staticmethod
-    def get_all_carts(token, db: Session, page: int, limit: int):
-        user_id = get_current_user(token)
-        carts = db.query(Cart).filter(Cart.user_id == user_id).offset((page - 1) * limit).limit(limit).all()
-        message = f"Page {page} with {limit} carts"
-        return ResponseHandler.success(message, carts)
+    def __init__(self, db):
+        # db is your MongoDB database instance
+        self.carts = db["carts_collection"]
+        self.products = db["products_collection"]
 
-    # Get A Cart By ID
-    @staticmethod
-    def get_cart(token, db: Session, cart_id: int):
-        user_id = get_current_user(token)
-        cart = db.query(Cart).filter(Cart.id == cart_id, Cart.user_id == user_id).first()
-        if not cart:
-            ResponseHandler.not_found_error("Cart", cart_id)
-        return ResponseHandler.get_single_success("cart", cart_id, cart)
+    def get_all_carts(self, token, page: int, limit: int):
+        print(token.credentials)
+        user_id = get_token_payload(token.credentials).get("id")
 
-    # Create a new Cart
-    @staticmethod
-    def create_cart(token, db: Session, cart: CartCreate):
-        user_id = get_current_user(token)
-        cart_dict = cart.model_dump()
+        cursor = (
+            self.carts.find({"user_id": user_id})
+            .sort("_id", 1)
+            .skip((page - 1) * limit)
+            .limit(limit)
+        )
+        carts = array_serialize_doc(cursor)
 
-        cart_items_data = cart_dict.pop("cart_items", [])
-        cart_items = []
-        total_amount = 0
-        for item_data in cart_items_data:
-            product_id = item_data['product_id']
-            quantity = item_data['quantity']
+        return ResponseHandler.success(f"Page {page} with {limit} carts", carts)
 
-            product = db.query(Product).filter(Product.id == product_id).first()
-            if not product:
-                return ResponseHandler.not_found_error("Product", product_id)
+    def get_cart(self, token, cart_id: str):
+        user_id = get_token_payload(token.credentials).get("id")
+        try:
+            oid = ObjectId(cart_id)
+        except:
+            return ResponseHandler.not_found_error("Cart", cart_id)
 
-            subtotal = quantity * product.price * (product.discount_percentage / 100)
-            cart_item = CartItem(product_id=product_id, quantity=quantity, subtotal=subtotal)
-            total_amount += subtotal
-
-            cart_items.append(cart_item)
-        cart_db = Cart(cart_items=cart_items, user_id=user_id, total_amount=total_amount, **cart_dict)
-        db.add(cart_db)
-        db.commit()
-        db.refresh(cart_db)
-        return ResponseHandler.create_success("Cart", cart_db.id, cart_db)
-
-    # Update Cart & CartItem
-    @staticmethod
-    def update_cart(token, db: Session, cart_id: int, updated_cart: CartUpdate):
-        user_id = get_current_user(token)
-
-        cart = db.query(Cart).filter(Cart.id == cart_id, Cart.user_id == user_id).first()
+        cart = self.carts.find_one({"_id": oid, "user_id": user_id})
         if not cart:
             return ResponseHandler.not_found_error("Cart", cart_id)
 
-        # Delete existing cart_items
-        db.query(CartItem).filter(CartItem.cart_id == cart_id).delete()
+        return ResponseHandler.get_single_success("cart", cart_id, serialize_doc(cart))
+
+    def create_cart(self, token, cart: CartCreate):
+        user_id = get_token_payload(token.credentials).get("id")
+        cart_dict = cart.model_dump()
+        cart_items_data = cart_dict.pop("cart_items", [])
+
+        cart_items = []
+        total_amount = 0
+
+        for item in cart_items_data:
+            product = self.products.find_one({"blob": item["product_id"]})
+            if not product:
+                return ResponseHandler.not_found_error("Product", item["product_id"])
+
+            subtotal = item["quantity"] * product["price"] * (product["discount_percentage"] / 100)
+            total_amount += subtotal
+            cart_items.append({
+                "product_id": str(item["product_id"]),
+                "quantity": item["quantity"],
+                "subtotal": subtotal
+            })
+
+        cart_doc = {
+            "user_id": user_id,
+            "cart_items": cart_items,
+            "total_amount": total_amount,
+            **cart_dict
+        }
+        result = self.carts.insert_one(cart_doc)
+        new_cart = self.carts.find_one({"_id": result.inserted_id})
+
+        return ResponseHandler.create_success("Cart", str(new_cart["_id"]), serialize_doc(new_cart))
+
+    def update_cart(self, token, cart_id: str, updated_cart: CartUpdate):
+        user_id = get_token_payload(token.credentials).get("id")
+        try:
+            cart_oid = ObjectId(cart_id)
+        except:
+            return ResponseHandler.not_found_error("Cart", cart_id)
+
+        cart_exists = self.carts.find_one({"_id": cart_oid, "user_id": user_id})
+        if not cart_exists:
+            return ResponseHandler.not_found_error("Cart", cart_id)
+
+        new_cart_items = []
+        total_amount = 0
 
         for item in updated_cart.cart_items:
-            product_id = item.product_id
-            quantity = item.quantity
+            try:
+                prod_oid = ObjectId(item.product_id)
+            except:
+                return ResponseHandler.not_found_error("Product", item.product_id)
 
-            product = db.query(Product).filter(Product.id == product_id).first()
+            product = self.products.find_one({"_id": prod_oid})
             if not product:
-                return ResponseHandler.not_found_error("Product", product_id)
+                return ResponseHandler.not_found_error("Product", item.product_id)
 
-            subtotal = quantity * product.price * (product.discount_percentage / 100)
+            subtotal = item.quantity * product["price"] * (product["discount_percentage"] / 100)
+            total_amount += subtotal
+            new_cart_items.append({
+                "product_id": str(prod_oid),
+                "quantity": item.quantity,
+                "subtotal": subtotal
+            })
 
-            cart_item = CartItem(
-                cart_id=cart_id,
-                product_id=product_id,
-                quantity=quantity,
-                subtotal=subtotal
-            )
-            db.add(cart_item)
-
-        cart.total_amount = sum(item.subtotal for item in cart.cart_items)
-
-        db.commit()
-        db.refresh(cart)
-        return ResponseHandler.update_success("cart", cart.id, cart)
-
-    # Delete Both Cart and CartItems
-    @staticmethod
-    def delete_cart(token, db: Session, cart_id: int):
-        user_id = get_current_user(token)
-        cart = (
-            db.query(Cart)
-            .options(joinedload(Cart.cart_items).joinedload(CartItem.product))
-            .filter(Cart.id == cart_id, Cart.user_id == user_id)
-            .first()
+        self.carts.update_one(
+            {"_id": cart_oid, "user_id": user_id},
+            {"$set": {"cart_items": new_cart_items, "total_amount": total_amount}}
         )
+
+        updated = self.carts.find_one({"_id": cart_oid})
+        return ResponseHandler.update_success("cart", cart_id, serialize_doc(updated))
+
+    def delete_cart(self, token, cart_id: str):
+        user_id = get_token_payload(token.credentials).get("id")
+        try:
+            cart_oid = ObjectId(cart_id)
+        except:
+            return ResponseHandler.not_found_error("Cart", cart_id)
+
+        cart = self.carts.find_one({"_id": cart_oid, "user_id": user_id})
         if not cart:
-            ResponseHandler.not_found_error("Cart", cart_id)
+            return ResponseHandler.not_found_error("Cart", cart_id)
 
-        for cart_item in cart.cart_items:
-            db.delete(cart_item)
-
-        db.delete(cart)
-        db.commit()
-        return ResponseHandler.delete_success("Cart", cart_id, cart)
+        self.carts.delete_one({"_id": cart_oid, "user_id": user_id})
+        return ResponseHandler.delete_success("Cart", cart_id, serialize_doc(cart))
