@@ -31,3 +31,4 @@ alembic/versions/
 
 # macOS
 .DS_Store
+.vercel
