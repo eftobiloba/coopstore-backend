@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field
-from typing import List
+from pydantic import BaseModel, EmailStr, Field
+from typing import List, Optional
 from datetime import datetime
 from app.schemas.products import ProductBase, CategoryBase
 
@@ -91,3 +91,24 @@ class CartCreate(BaseModel):
 # Update Cart
 class CartUpdate(CartCreate):
     pass
+
+class CheckoutProduct(BaseModel):
+    id: str
+    amount: float
+    name: str
+    price: float
+    originalPrice: Optional[float] = None
+    image: str
+    category: str
+    quantity: int
+    loanAvailable: bool
+
+
+class CheckoutBase(BaseModel):
+    coop_id: str
+    email: EmailStr
+    paid: bool
+    payment_method: str  # BNPL or transfer
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    products: List[CheckoutProduct]
+    total_amount: float

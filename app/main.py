@@ -1,4 +1,4 @@
-from app.routers import products, categories, carts, users, auth, accounts, scraping
+from app.routers import products, categories, carts, users, auth, accounts, scraping, checkout
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -61,3 +61,4 @@ app.include_router(users.router)
 app.include_router(accounts.router)
 app.include_router(auth.router)
 app.include_router(scraping.router)
+app.include_router(checkout.router)
