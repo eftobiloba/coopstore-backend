@@ -10,11 +10,13 @@ class CategoryBase(BaseModel):
 class CategoryCreate(BaseModel):
     name: str
     number: int
+    image: str
 
 
 class CategoryUpdate(BaseModel):
     name: Optional[str] = None
     number: Optional[int] = None
+    image: Optional[str] = None
 
 
 class CategoryOut(BaseModel):
