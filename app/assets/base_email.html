@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>${subject}</title>
+  <style>
+    body { font-family: Arial, sans-serif; background-color: #f8f9fa; padding: 20px; }
+    .container { max-width: 600px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; }
+    .header { text-align: center; margin-bottom: 20px; }
+    .header img { max-width: 180px; }
+    h1 { color: #3418f0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    table th, table td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+    .total { font-weight: bold; font-size: 18px; color: #3418f0; margin-top: 20px; }
+    .footer { margin-top: 30px; font-size: 14px; color: #666; border-top: 1px solid #ddd; padding-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="https://coopstoreonline.com/coop-store-logo.png" alt="CoopStore Logo" />
+    </div>
+    ${content} <!-- Page-specific content will be injected here -->
+    <div class="footer">
+      <p>This is an automated email from <strong>CoopStore</strong>.</p>
+    </div>
+  </div>
+</body>
+</html>

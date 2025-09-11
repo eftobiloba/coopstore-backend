@@ -1,0 +1,23 @@
+<!-- user_order_pending.html -->
+${base_start}
+<h1>Order Received – CoopStore</h1>
+<p>Hi there,</p>
+<p>Your order has been received and is being processed. Thank you for shopping with <strong>CoopStore</strong>!</p>
+
+<table>
+  <thead>
+    <tr style="background: #f97316; color: white;">
+      <th>Product</th>
+      <th>Qty</th>
+      <th>Price</th>
+      <th>Total</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${rendered_items}
+  </tbody>
+</table>
+
+<p class="total">Order Total: ₦${total_amount}</p>
+<p>We’ll notify you once your order is shipped.</p>
+${base_end}
