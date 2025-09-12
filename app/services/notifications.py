@@ -63,7 +63,7 @@ def send_email_via_api(
         "X-API-Key": settings.api_key
     }
 
-    url = f"{settings.base_url}/nofications/send-raw"
+    url = f"{settings.base_url}/notifications/send-raw"
     response = requests.post(url, json=payload, headers=headers)
 
     if response.status_code == 200:

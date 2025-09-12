@@ -22,7 +22,7 @@ async def save_checkout(checkout: CheckoutBase, background_tasks: BackgroundTask
 
         background_tasks.add_task(
             send_email_via_api,
-            "admin@rapport.com.ng",
+            "support@coopstoreonline.com",
             "An Order has been placed",
             "admin_order_pending.html",
             serialized_checkout
